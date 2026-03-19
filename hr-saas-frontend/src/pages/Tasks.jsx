@@ -57,6 +57,17 @@ function normalizeTasks(data) {
   }))
 }
 
+function mergeTaskWithDraftMeta(task, draftMeta) {
+  const meta = draftMeta[task?.id] ?? {}
+
+  return {
+    ...task,
+    status: task?.status ?? "TODO",
+    description: task?.description ?? meta.description ?? "",
+    due_date: task?.due_date ?? meta.dueDate ?? "",
+  }
+}
+
 function Tasks() {
   const { role, payload } = useAuth()
   const isReadOnly = role === "employee"
@@ -89,7 +100,7 @@ function Tasks() {
       setIsLoading(true)
       console.log("Token:", localStorage.getItem("token"))
       const res = await api.get("/tasks")
-      const nextTasks = normalizeTasks(res.data)
+      const nextTasks = normalizeTasks(res.data).map((task) => mergeTaskWithDraftMeta(task, taskDraftMeta))
       console.log("Tasks fetched:", nextTasks)
       setTasks(nextTasks)
     } catch (error) {
@@ -123,6 +134,9 @@ function Tasks() {
 
   useEffect(() => {
     fetchTasks()
+  }, [taskDraftMeta])
+
+  useEffect(() => {
     fetchUsers()
   }, [])
 
@@ -135,6 +149,17 @@ function Tasks() {
 
   const createTask = async () => {
     const trimmedTitle = title.trim()
+    const trimmedDescription = description.trim()
+    const dueDateValue = dueDate ? `${dueDate}T00:00:00` : null
+    const tempId = `temp-${Date.now()}`
+    const newTask = {
+      id: tempId,
+      title: trimmedTitle,
+      assigned_to: assignedTo,
+      description: trimmedDescription,
+      due_date: dueDateValue,
+      status: "TODO",
+    }
 
     try {
       if (!canManageTasks || isCreating) return
@@ -144,31 +169,50 @@ function Tasks() {
       setSuccess("")
       setIsCreating(true)
 
+      setTasks((prev) => [newTask, ...prev])
+
       const payload = {
         title: trimmedTitle,
+        description: trimmedDescription || null,
         assigned_to: assignedTo,
+        due_date: dueDateValue,
       }
 
       console.log("Creating task:", payload)
       const res = await api.post("/tasks", payload)
-
-      if (res?.data?.id) {
-        setTaskDraftMeta((prev) => ({
-          ...prev,
-          [res.data.id]: {
-            description: description.trim(),
-            dueDate,
-          },
-        }))
+      const createdTask = {
+        ...newTask,
+        ...res.data,
+        id: res?.data?.id ?? tempId,
+        description: res?.data?.description ?? newTask.description,
+        due_date: res?.data?.due_date ?? newTask.due_date,
+        status: res?.data?.status ?? newTask.status,
       }
+
+      setTaskDraftMeta((prev) => {
+        const next = { ...prev }
+        next[createdTask.id] = {
+          description: createdTask.description,
+          dueDate: createdTask.due_date,
+        }
+        delete next[tempId]
+        return next
+      })
+
+      setTasks((prev) =>
+        prev.map((task) => {
+          if (task.id !== tempId) return task
+          return createdTask
+        })
+      )
 
       resetTaskForm()
       setSuccess("Task created successfully.")
       showSuccessToast("Task created", `${trimmedTitle} is now on the board.`)
-      await fetchTasks()
       setIsCreateOpen(false)
     } catch (error) {
       console.error("[Tasks] Failed to create task:", error)
+      setTasks((prev) => prev.filter((task) => task.id !== tempId))
       const message = getErrorMessage(error, "Failed to create task")
       setError(message)
       showErrorToast("Task creation failed", message)
@@ -351,35 +395,32 @@ function Tasks() {
               <div className="grid gap-4 xl:grid-cols-2">
                 {tasks.map((task) => {
                   const assignee = userById.get(String(task.assigned_to))
-                  const draftMeta = taskDraftMeta[task.id] ?? {}
-                  const resolvedDescription = task.description || draftMeta.description
-                  const resolvedDueDate = task.due_date || draftMeta.dueDate
                   const canEmployeeUpdate = String(task.assigned_to) === String(currentUserId)
                   const assignedLabel = assignee?.name || assignee?.email || "Unknown"
 
                   return (
                     <Card key={task.id} className="rounded-3xl border-slate-800 bg-gradient-to-br from-slate-950 to-slate-900 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-slate-950/20">
                       <CardContent className="space-y-5 p-5">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <h2 className="truncate text-lg font-semibold text-white">{task.title}</h2>
-                            <p className="mt-2 text-sm text-slate-300">Assigned to: {assignedLabel}</p>
+                        <div className="space-y-3">
+                          <h2 className="truncate text-lg font-semibold text-white">{task.title}</h2>
+                          <p className="text-slate-300">{task.description || "No description"}</p>
+                          <p className="text-xs text-slate-400">Due: {formatDueDate(task.due_date) || "No deadline"}</p>
+                          <p className="text-sm text-slate-300">Assigned to: {assignedLabel}</p>
+                          <div className="flex items-center justify-between gap-3">
+                            <Badge className={badgeClass(task.status)}>{formatStatus(task.status)}</Badge>
+                            {!isReadOnly ? (
+                              <Button variant="destructive" className="rounded-xl" onClick={() => deleteTask(task.id)} disabled={deletingIds.has(task.id)}>
+                                {deletingIds.has(task.id) ? "Deleting..." : "Delete"}
+                              </Button>
+                            ) : (
+                              <Badge className="border-slate-700 bg-slate-900 text-slate-300">
+                                {canEmployeeUpdate ? "Status editable" : "Read-only"}
+                              </Badge>
+                            )}
                           </div>
-                          <Badge className={badgeClass(task.status)}>{formatStatus(task.status)}</Badge>
                         </div>
 
                         <Separator />
-
-                        <div className="space-y-3 text-sm text-slate-300">
-                          <div className="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3">
-                            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Description</p>
-                            <p className="mt-2">{resolvedDescription || "No description provided."}</p>
-                          </div>
-                          <div className="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3">
-                            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Due date</p>
-                            <p className="mt-2">{formatDueDate(resolvedDueDate) || "No due date set."}</p>
-                          </div>
-                        </div>
 
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <select
@@ -394,16 +435,6 @@ function Tasks() {
                               </option>
                             ))}
                           </select>
-
-                          {!isReadOnly ? (
-                            <Button variant="destructive" className="rounded-xl" onClick={() => deleteTask(task.id)} disabled={deletingIds.has(task.id)}>
-                              {deletingIds.has(task.id) ? "Deleting..." : "Delete"}
-                            </Button>
-                          ) : (
-                            <Badge className="border-slate-700 bg-slate-900 text-slate-300">
-                              {canEmployeeUpdate ? "Status editable" : "Read-only"}
-                            </Badge>
-                          )}
                         </div>
                       </CardContent>
                     </Card>

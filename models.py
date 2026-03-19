@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, String, ForeignKey, DateTime
+from sqlalchemy import Column, String, ForeignKey, DateTime, Text
 from sqlalchemy import Enum
 from sqlalchemy.orm import relationship
 from database import Base
@@ -36,13 +36,13 @@ class Task(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     title = Column(String, nullable=False)
-    description = Column(String, nullable=True)
+    description = Column(Text, nullable=True)
 
     assigned_to = Column(String, ForeignKey("users.id"))
     created_by = Column(String, ForeignKey("users.id"))
 
     status = Column(Enum(TaskStatus), default=TaskStatus.TODO)
-    due_date = Column(String, nullable=True)
+    due_date = Column(DateTime, nullable=True)
 
     tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False)
 

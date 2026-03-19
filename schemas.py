@@ -50,14 +50,14 @@ class TaskCreate(BaseModel):
     title: str
     description: str | None = None
     assigned_to: str
-    due_date: str | None = None
+    due_date: datetime | None = None
 
 
 class TaskUpdate(BaseModel):
     title: str | None = None
     description: str | None = None
     status: TaskStatus | None = None
-    due_date: str | None = None
+    due_date: datetime | None = None
 
 
 class TaskResponse(BaseModel):
@@ -67,7 +67,7 @@ class TaskResponse(BaseModel):
     assigned_to: str
     created_by: str
     status: TaskStatus
-    due_date: str | None
+    due_date: datetime | None
     tenant_id: str
     created_at: str | None
     updated_at: str | None

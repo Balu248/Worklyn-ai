@@ -1,16 +1,14 @@
+import os
 import chromadb
-from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer
 import requests
 from uuid import uuid4
 
-client = chromadb.Client(
-    Settings(
-        persist_directory="./chroma_data",
-        anonymized_telemetry=False,
-        is_persistent=True
-    )
-)
+PERSIST_DIRECTORY = "chroma_data"
+
+os.makedirs(PERSIST_DIRECTORY, exist_ok=True)
+
+client = chromadb.PersistentClient(path=PERSIST_DIRECTORY)
 # Create embedding model
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
@@ -35,7 +33,12 @@ def store_chunks(chunks: list, tenant_id: str):
             metadatas=[{"tenant_id": tenant_id}]
         )
 
+    persist = getattr(client, "persist", None)
+    if callable(persist):
+        persist()
+
 def query_chunks(question: str, tenant_id: str):
+    print(f"Retrieving for tenant: {tenant_id}")
     question_embedding = embed_text(question)
 
     results = collection.query(
