@@ -215,11 +215,9 @@ def upload_policy(
     # Chunk text
     chunks = chunk_text(text)
 
-    # Store in vector DB
     tenant_id = current_user["tenant_id"]
     store_chunks(chunks, tenant_id)
 
-    # ✅ ADD THIS PART HERE (INSIDE FUNCTION)
     new_policy = models.Policy(
         id=str(uuid4()),
         filename=original_filename,

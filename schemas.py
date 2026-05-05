@@ -6,7 +6,6 @@ from datetime import datetime
 class TenantCreate(BaseModel):
     name: str
 
-
 class TenantResponse(BaseModel):
     id: str
     name: str
@@ -20,7 +19,6 @@ class UserCreate(BaseModel):
     tenant_id: str
     role: str
     name: str
-
 
 class UserResponse(BaseModel):
     id: str
@@ -52,13 +50,11 @@ class TaskCreate(BaseModel):
     assigned_to: str
     due_date: datetime | None = None
 
-
 class TaskUpdate(BaseModel):
     title: str | None = None
     description: str | None = None
     status: TaskStatus | None = None
     due_date: datetime | None = None
-
 
 class TaskResponse(BaseModel):
     id: str
@@ -85,13 +81,11 @@ class UserOut(BaseModel):
     class Config:
         from_attributes = True
 
-
 class PolicyOut(BaseModel):
     id: str
     filename: str
     tenant_id: str
     uploaded_by: str
     created_at: datetime | None
-
     class Config:
         from_attributes = True

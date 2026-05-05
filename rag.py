@@ -66,7 +66,7 @@ Question:
 
 Answer:
 """
-
+ 
     response = requests.post(
         "http://host.docker.internal:11434/api/generate",
         json={
